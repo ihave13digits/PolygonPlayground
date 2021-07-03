@@ -14,6 +14,10 @@ public:
 
 public:
 
+    bool debug = true;
+    bool rotate_selected = true;
+    bool mouse_distances = true;
+
     float rotation = 0.0;
     float radius = 25.0;
     float speed = 0.01;
@@ -66,7 +70,8 @@ public:
         int closest_index = 0;
         int index = 0;
 
-        for (int i = 0; i < polygons[selected_polygon].size(); i++)
+        int limit = polygons[selected_polygon].size();
+        for (int i = 0; i < limit; i++)
         {
             float dx = polygons[selected_polygon].points[i].x + polygons[selected_polygon].x - X;
             float dy = polygons[selected_polygon].points[i].y + polygons[selected_polygon].y - Y;
@@ -76,7 +81,11 @@ public:
                 ld = d;
                 closest_index = i;
             }
-            DrawCircle(dx+X, dy+Y, d, olc::RED);
+            if (debug)
+            {
+                DrawCircle(dx+X, dy+Y, d, olc::Pixel(0, i*(255/limit), 128));
+                if (mouse_distances) { DrawCircle(GetMouseX(), GetMouseY(), d, olc::Pixel(i*(255/limit), 128, 0)); }
+            }
         }
         return closest_index;
     }
@@ -120,11 +129,11 @@ public:
 
     void draw_polygon(int i)
     {
-        if (polygons[i].size() > 1)
+        float offx = polygons[i].x;
+        float offy = polygons[i].y;
+        
+        if (polygons[i].size() > 0)
         {
-            float offx = polygons[i].x;
-            float offy = polygons[i].y;
-
             // Draw Lines of Polygon
             for (int p = 0; p < polygons[i].size(); p++)
             {
@@ -151,9 +160,9 @@ public:
                 Draw(x, y, points_color);
                 if (p == get_nearest_vertex(GetMouseX(), GetMouseY()) && i == selected_polygon) { Draw(x, y, nearest_color); }
             }
-            // Draw Position of Polygon
-            Draw(offx, offy, position_color);
         }
+        // Draw Position of Polygon
+        Draw(offx, offy, position_color);
     }
 
 
@@ -165,7 +174,7 @@ public:
     void update_rotations()
     {
         rotation += speed;
-        if (rotation > 1) { rotation -= 1; }
+        if (rotation > 6.28) { rotation -= 6.28; }
     }
 
     bool OnUserCreate() override
@@ -191,44 +200,26 @@ public:
         }
     }
 
+    bool key_state(int state)
+    {
+        switch (state)
+        { // 1-CTRL 2-SHIFT 3-TAB 0-NONE
+            case 0 : { if (!GetKey(olc::Key::CTRL).bHeld && !GetKey(olc::Key::SHIFT).bHeld && !GetKey(olc::Key::TAB).bHeld) return true; } break;
+            case 1 : { if (GetKey(olc::Key::CTRL).bHeld && !GetKey(olc::Key::SHIFT).bHeld && !GetKey(olc::Key::TAB).bHeld) return true; } break;
+            case 2 : { if (GetKey(olc::Key::SHIFT).bHeld && !GetKey(olc::Key::CTRL).bHeld && !GetKey(olc::Key::TAB).bHeld) return true; } break;
+            case 3 : { if (GetKey(olc::Key::TAB).bHeld && !GetKey(olc::Key::CTRL).bHeld && !GetKey(olc::Key::SHIFT).bHeld) return true; } break;
+        }
+        return false;
+    }
+
     bool OnUserUpdate(float fElapsedTime) override
     {
         // Stuff
 
         Clear(olc::BLACK);
 
-        if (GetKey(olc::Key::TAB).bHeld)
-        {
-            // Add Generated Polygon
-            if (GetMouse(0).bHeld)
-            {
-                float X = GetMouseX()-polygons[selected_polygon].x;
-                float Y = GetMouseY()-polygons[selected_polygon].y;
-                int trgt = polygons[selected_polygon].get_closest_point(GetMouseX(), GetMouseY());
-                polygons[selected_polygon].set_point(X, Y, trgt);
-            }
-        }
-        if (GetKey(olc::Key::CTRL).bHeld && !GetKey(olc::Key::TAB).bHeld)
-        {
-            // Add Generated Polygon
-            if (GetMouse(0).bReleased)
-            {
-                add_polygon();
-                selected_polygon = polygons.size()-1;
-                polygons[selected_polygon].set_position(GetMouseX(), GetMouseY());
-                polygons[selected_polygon].generate_polygon(radius, vertices, rotation);
-            }
-            // Remove Polygon
-            if (GetMouse(1).bReleased)
-            {
-                if (selected_polygon > 0)
-                {
-                    selected_polygon = polygons.size()-1;
-                    del_polygon();
-                }
-            }
-        }
-        if (!GetKey(olc::Key::CTRL).bHeld && !GetKey(olc::Key::TAB).bHeld)
+        // (Click)
+        if (key_state(0))
         {
             // Add Vertex
             if (GetMouse(0).bReleased)
@@ -254,45 +245,91 @@ public:
                     {
                         polygons[selected_polygon].del_point(trgt);
                     }
-                    else { del_polygon(); }
+                    else
+                    {
+                        del_polygon();
+                        selected_polygon = polygons.size()-1;
+                    }
                 }
             }
         }
-        // Add Custom Polygon
-        if (GetKey(olc::Key::SHIFT).bHeld)
+        // (Ctrl-Click)
+        if (key_state(1) && polygons.size() > 0)
+        {
+            // Move Closest Vertex
+            if (GetMouse(0).bHeld)
+            {
+                float X = GetMouseX()-polygons[selected_polygon].x;
+                float Y = GetMouseY()-polygons[selected_polygon].y;
+                int trgt = polygons[selected_polygon].get_closest_point(GetMouseX(), GetMouseY());
+                polygons[selected_polygon].set_point(X, Y, trgt);
+            }
+            // Move Polygon
+            if (GetMouse(1).bHeld)
+            {
+                float X = GetMouseX();
+                float Y = GetMouseY();
+                polygons[selected_polygon].set_position(X, Y);
+            }
+        }
+        // (Shift-Click)
+        if (key_state(2))
+        {
+            // Add Generated Polygon
+            if (GetMouse(0).bReleased)
+            {
+                add_polygon();
+                selected_polygon = polygons.size()-1;
+                polygons[selected_polygon].set_position(GetMouseX(), GetMouseY());
+                polygons[selected_polygon].generate_polygon(radius, vertices, rotation);
+            }
+            // Remove Polygon
+            if (GetMouse(1).bReleased)
+            {
+                if (selected_polygon > 0)
+                {
+                    selected_polygon = polygons.size()-1;
+                    del_polygon();
+                }
+            }
+        }
+        // Add Custom Polygon (Tab-Click)
+        if (key_state(3))
         {
             if (GetMouse(0).bReleased)
             {
                 add_polygon();
-                polygons[selected_polygon].set_position(GetMouseX(), GetMouseY());
                 selected_polygon = polygons.size()-1;
+                polygons[selected_polygon].set_position(GetMouseX(), GetMouseY());
             }
         }
 
-
+        // Scale Polygon
         if (GetKey(olc::Key::Q).bPressed) { polygons[selected_polygon].update_polygon(1.1); }
         if (GetKey(olc::Key::E).bPressed) { polygons[selected_polygon].update_polygon(0.9); }
-
-
+        // Selected Polygon
         if (GetKey(olc::Key::Z).bPressed) { if (selected_polygon > 0) selected_polygon--; }
         if (GetKey(olc::Key::C).bPressed) { if (selected_polygon < polygons.size()-1) selected_polygon++; }
-
-
+        // Vertex Count
         if (GetKey(olc::Key::W).bPressed) { vertices++; }
         if (GetKey(olc::Key::S).bPressed) { if (vertices > 1) vertices--; }
-
-
+        // Radius Scale
         if (GetKey(olc::Key::A).bHeld) { radius -= 0.1; }
         if (GetKey(olc::Key::D).bHeld) { radius += 0.1; }
+        // Toggle Debug
+        if (GetKey(olc::Key::T).bPressed) { debug = !debug; }
+        if (GetKey(olc::Key::R).bPressed) { rotate_selected = !rotate_selected; }
+        if (GetKey(olc::Key::M).bPressed) { mouse_distances = !mouse_distances; }
 
-        if (GetKey(olc::Key::T).bPressed) { construct_polygon(); }
-
-        rotation += speed;
-        if (rotation > 6.28) { rotation -= 6.28;}
+        update_rotations();
         // Update Polygon Shape
         for (int i = 0; i < polygons.size(); i++)
         {
-            if (i != selected_polygon) polygons[i].update_polygon();
+            if (!rotate_selected)
+            {
+                if (i != selected_polygon) polygons[i].update_polygon();
+            }
+            else { polygons[i].update_polygon(); }
             polygons[i].rotation = rotation;
             draw_polygon(i);
         }
