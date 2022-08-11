@@ -19,9 +19,9 @@ public:
     bool mouse_distances = true;
 
     float rotation = 0.0;
-    float radius = 25.0;
+    float radius = 32.0;
     float speed = 0.01;
-    int vertices = 3;
+    int vertices = 5;
     int selected_polygon = 0;
 
     olc::Pixel lines_color = olc::Pixel(32, 32, 32);
@@ -189,15 +189,31 @@ public:
         selected_polygon = polygons.size()-1;
         polygons[selected_polygon].x = GetMouseX();
         polygons[selected_polygon].y = GetMouseY();
-        for (int y = -1; y < 2; y++)
+        int count = 0;
+        for (int y = -(vertices-1); y < vertices; y++)
         {
-            for (int x = -2; x < 3; x++)
+            for (int x = -(vertices-1); x < vertices; x++)
             {
-                float X = x*16;
-                float Y = y*16;
-                polygons[selected_polygon].insert_point(X, Y, get_nearest_vertex(X, Y));
+                float X = x*radius;
+                float Y = y*radius;
+                polygons[selected_polygon].insert_point(X, Y, count);
+                count++;
             }
         }
+    }
+
+    bool collision(int c1, int c2)
+    {
+        for (int v = 0; v < polygons[c1].size(); v++)
+        {
+            float X = polygons[c1].points[v].x;
+            float Y = polygons[c1].points[v].y;
+            if (polygons[c2].intersecting(X, Y))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool key_state(int state)
@@ -217,6 +233,11 @@ public:
         // Stuff
 
         Clear(olc::BLACK);
+
+        if (polygons.size() > 0)
+        {
+            if (polygons[0].intersecting(GetMouseX(), GetMouseY())) { std::cout << "Intersecting Edge" << std::endl; }
+        }
 
         // (Click)
         if (key_state(0))
@@ -320,6 +341,7 @@ public:
         if (GetKey(olc::Key::T).bPressed) { debug = !debug; }
         if (GetKey(olc::Key::R).bPressed) { rotate_selected = !rotate_selected; }
         if (GetKey(olc::Key::M).bPressed) { mouse_distances = !mouse_distances; }
+        if (GetKey(olc::Key::L).bPressed) { construct_polygon(); }
 
         update_rotations();
         // Update Polygon Shape

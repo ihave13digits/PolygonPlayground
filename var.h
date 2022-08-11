@@ -1,8 +1,8 @@
 namespace var
 {
 
-    int width = 512;
-    int height = 288;
-    int pixel_size = 2;
+    int width = 1024;
+    int height = 566;
+    int pixel_size = 1;
 
 }
